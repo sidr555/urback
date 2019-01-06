@@ -21,9 +21,90 @@ app.set('port', port);
 
 var server = http.createServer(app);
 
+//var io = require('socket.io')(server);
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ server: server });
+wss.on('connection', function connection(ws) {
+  console.log('connected client');
+
+  let ponged = true;
+
+  let jumpTask = setInterval(function(){
+    ws.send("Jump");
+    console.log("send Jump command to " + ws.login);
+  }, 900);
+
+  let fireTask = setInterval(function(){
+    ws.send("Fire", {}, function(err, data){
+      console.log("FIRRR ", err, data);
+    });
+    console.log("send Fire command to " + ws.login);
+  }, 1500);
+
+  let pingTask = setInterval(function(){
+    if (!ponged) {
+      console.log("CLOSE BECAUSE OF PONG TIMEOUT FROM " + ws.login);
+      ws.login = null;
+      ws.close();
+
+      clearInterval(pingTask);
+      clearInterval(jumpTask);
+      clearInterval(fireTask);
+
+    } else {
+      ponged = false;
+      ws.send("ping");
+      console.log("PING TO " + ws.login);
+    }
+  }, 1000);
+
+
+  ws.on('message', function incoming(message) {
+    if (message === "pong") {
+      ponged = true;
+      console.log("PONG FROM " + ws.login);
+
+    } else if (message.substr(0, 4) == "I'm ") {
+      ws.login = message.substr(4);
+      console.log('registered: %s', ws.login);
+      ws.send("Greetings, " + ws.login);
+    } else {
+      console.log('received from %s: %s', ws.login, message);
+      //ws.send("answered on " + message);
+    }
+
+  });
+
+  // ws.on('ping', function incoming(message) {
+  //   console.log('received ping: %s', message);
+  // });
+
+
+  // ws.on("pong", function(){
+  //   ponged = true;
+  //   console.log("PONG FROM " + ws.login);
+  // });
+
+  console.log("ping Task", pingTask);
+
+  ws.send("whoisthere");
+
+
+  ws.on('close', function(){
+    console.log("Closed")
+  });
+
+  ws.on('error', function(){
+    console.log("error")
+  });
+
+
+});
+
 /**
  * Listen on provided port, on all network interfaces.
  */
+console.log("Starting server");
 
 server.listen(port);
 server.on('error', onError);
@@ -87,4 +168,19 @@ function onListening() {
     ? 'pipe ' + addr
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
+  console.log('Listening on ' + bind);
 }
+
+
+// io.on("connection", function(socket){
+//    console.log("connected socket");
+//
+//   socket.on("ping", function(data){
+//     console.log("ping");
+//     socket.emit("ping", "123");
+//   });
+//   socket.on("message", function(data){
+//     console.log("message", data);
+//     //socket.emit("ping", "123");
+//   });
+// });
